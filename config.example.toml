@@ -1,0 +1,15 @@
+# rustdesk-bootstrap configuration
+# Save as rustdesk-bootstrap.toml near the EXE
+# or C:\ProgramData\RustDeskDeploy\config.toml
+
+# RustDesk ID server (HBBS:port)
+hbbs = "YOUR_HBBS_HOST:21116"
+
+# Public key for your RustDesk server
+key = "PASTE_PUBLIC_KEY_HERE"
+
+# Optional relay server
+# relay = "relay.example.com:21117"
+
+# Optional permanent password (string). Omit or comment out if not needed.
+# perm_password = "YourPasswordHere"

@@ -1,3 +1,2 @@
 /target
-rustdesk-bootstrap.toml
-config.toml
+config.local.rs

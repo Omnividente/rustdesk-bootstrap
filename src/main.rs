@@ -11,7 +11,6 @@ use std::{
 
 use core::ffi::c_void;
 use regex::Regex;
-use serde::Deserialize;
 use crate::win_handle_helpers::{is_null, null};
 
 
@@ -32,8 +31,10 @@ use windows_sys::Win32::Foundation::SYSTEMTIME;
 use windows_sys::Win32::System::SystemInformation::{GetVersionExW, OSVERSIONINFOW};
 
 /* ===================== ВАЖНО ===================== */
-// Все данные сервера и пароли вынесены в внешний конфиг.
-// См. config.example.toml и README.md.
+// Все данные сервера и пароли вынесены в локальный конфиг.
+// См. config.example.rs и README.md.
+mod config { include!(concat!(env!("OUT_DIR"), "/config.rs")); }
+use config::{HBBS, KEY, RELAY, PERM_PASSWORD};
 // Папка логов.
 const LOG_DIR: &str = r"C:\ProgramData\RustDeskDeploy\logs";
 // Размер буфера SID.
@@ -199,77 +200,6 @@ mod win7_prng_compat {
     }
 }
  
-// =============================================================================
-// ---------- Конфиг ----------
-
-#[derive(Debug, Deserialize)]
-struct AppConfig {
-    hbbs: String,
-    key: String,
-    relay: Option<String>,
-    perm_password: Option<String>,
-}
-
-static CFG: OnceLock<AppConfig> = OnceLock::new();
-
-fn cfg() -> &'static AppConfig {
-    CFG.get().expect("config not initialized")
-}
-
-fn parse_config_from_path(path: &PathBuf, log: &mut fs::File) -> Option<AppConfig> {
-    let raw = fs::read_to_string(path).ok()?;
-    match toml::from_str::<AppConfig>(&raw) {
-        Ok(c) => Some(c),
-        Err(e) => {
-            log_file_warn(log, &format!("config parse error {}: {}", path.display(), e));
-            None
-        }
-    }
-}
-
-fn default_config_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            paths.push(dir.join("rustdesk-bootstrap.toml"));
-        }
-    }
-    paths.push(PathBuf::from(r"C:\ProgramData\RustDeskDeploy\config.toml"));
-    paths
-}
-
-fn load_config(args: &[String], log_path: &PathBuf, log: &mut fs::File) -> AppConfig {
-    let mut paths = Vec::new();
-    for a in args {
-        if let Some(v) = a.strip_prefix("--config=") {
-            let p = PathBuf::from(v.trim_matches('"'));
-            paths.push(p);
-        }
-    }
-    if paths.is_empty() {
-        paths = default_config_paths();
-    }
-
-    for p in paths {
-        if p.exists() {
-            if let Some(c) = parse_config_from_path(&p, log) {
-                if c.hbbs.trim().is_empty() || c.key.trim().is_empty() {
-                    log_file_warn(log, &format!("config missing hbbs/key: {}", p.display()));
-                    continue;
-                }
-                log_file_info(log, &format!("Config: {}", p.display()));
-                return c;
-            }
-        }
-    }
-
-    fatal(
-        log_path,
-        log,
-        "Config not found. Create rustdesk-bootstrap.toml (see config.example.toml).",
-    )
-}
-
 // =============================================================================
 // ---------- WinHTTP (Win7+) ----------
 
@@ -676,7 +606,6 @@ fn get_service_binpath(name: &str) -> Option<PathBuf> {
 
 fn log_boot_header(
     log: &mut fs::File,
-    cfg: &AppConfig,
     already_installed: bool,
     local_installer: Option<&str>,
     force_x86: bool,
@@ -690,9 +619,9 @@ fn log_boot_header(
     log_file_info(log, &format!("Start: {}", now_log_ts()));
     log_file_info(log, &format!("User: {}  Host: {}  PID: {}", user, host, std::process::id()));
     log_file_info(log, &format!("OS: {}  Arch: {}  ForceX86: {}", os_version_string(), arch, force_x86));
-    log_file_info(log, &format!("HBBS: {}", cfg.hbbs));
-    log_file_info(log, &format!("Relay: {}", cfg.relay.as_deref().unwrap_or("-")));
-    log_file_info(log, &format!("PermPassword: {}", if cfg.perm_password.is_some() { "set" } else { "none" }));
+    log_file_info(log, &format!("HBBS: {}", HBBS));
+    log_file_info(log, &format!("Relay: {}", RELAY.unwrap_or("-")));
+    log_file_info(log, &format!("PermPassword: {}", if PERM_PASSWORD.is_some() { "set" } else { "none" }));
     log_file_info(log, &format!("AlreadyInstalled: {}", already_installed));
     if let Some(p) = local_installer {
         log_file_info(log, &format!("LocalInstaller: {}", p));
@@ -725,14 +654,11 @@ fn main() {
         return;
     }
 
-    let loaded_cfg = load_config(&args, &log_path, &mut log);
-    let _ = CFG.set(loaded_cfg);
-
     // Определяем, установлен ли уже RustDesk (нужно для расчета шагов).
     let already_installed = find_rustdesk_exe().is_some();
-    let total_steps = 7 + if cfg().perm_password.is_some() { 1 } else { 0 };
+    let total_steps = 7 + if PERM_PASSWORD.is_some() { 1 } else { 0 };
     log_set_total_steps(total_steps);
-    log_boot_header(&mut log, cfg(), already_installed, local_installer.as_deref(), force_x86);
+    log_boot_header(&mut log, already_installed, local_installer.as_deref(), force_x86);
 
     // Проверка системы.
     STEP!(&mut log, "Проверка системы");
@@ -764,7 +690,7 @@ fn main() {
     // Подготовка перед установкой.
     if !already_installed {
         STEP!(&mut log, "Предварительная настройка");
-        match write_configs(cfg(), &mut log) {
+        match write_configs(&mut log) {
             Ok(_) => OK!(&mut log, "Конфиги подготовлены"),
             Err(e) => WARN!(&mut log, "Не удалось записать конфиги: {}", e),
         }
@@ -816,11 +742,11 @@ fn main() {
     }
     // Конфиги до первого старта.
     STEP!(&mut log, "Запись конфигов");
-    write_configs(cfg(), &mut log).unwrap_or_else(|e| fatal(&log_path, &mut log, &format!("write config: {e}")));
+    write_configs(&mut log).unwrap_or_else(|e| fatal(&log_path, &mut log, &format!("write config: {e}")));
     OK!(&mut log, "Конфиги записаны");
 
     // Постоянный пароль.
-    if let Some(pw) = cfg().perm_password.as_deref() {
+    if let Some(pw) = PERM_PASSWORD {
         STEP!(&mut log, "Постоянный пароль");
         let ok = set_perm_password_safe(&rustexe, pw, &mut log);
         let synced = sync_user_config_to_service(&mut log);
@@ -1155,9 +1081,9 @@ fn fetch_latest_asset(is64: bool, log: &mut std::fs::File) -> Result<(String, St
 
 /* ---------------- Конфиги и пароль ---------------- */
 
-fn build_toml(cfg: &AppConfig) -> String {
+fn build_toml() -> String {
     let mut s = String::new();
-    s.push_str(&format!("rendezvous_server = \"{}\"\n", cfg.hbbs));
+    s.push_str(&format!("rendezvous_server = \"{}\"\n", HBBS));
     s.push_str("nat_type = 2\n");
     s.push_str("serial = 0\n");
     s.push_str("unlock_pin = \"\"\n");
@@ -1165,12 +1091,12 @@ fn build_toml(cfg: &AppConfig) -> String {
 
     s.push_str("[options]\n");
     s.push_str("av1-test = \"Y\"\n");
-    let host = cfg.hbbs.split(':').next().unwrap_or(&cfg.hbbs);
+    let host = HBBS.split(':').next().unwrap_or(HBBS);
     s.push_str(&format!("custom-rendezvous-server = \"{}\"\n", host));
-    s.push_str(&format!("key = \"{}\"\n", cfg.key));
+    s.push_str(&format!("key = \"{}\"\n", KEY));
     s.push_str("direct-access-port = \"21118\"\n");
     s.push_str("direct-server = \"Y\"\n");
-    if let Some(r) = &cfg.relay { s.push_str(&format!("relay_server = \"{}\"\n", r)); }
+    if let Some(r) = RELAY { s.push_str(&format!("relay_server = \"{}\"\n", r)); }
     s
 }
 
@@ -1187,8 +1113,8 @@ fn programdata_cfg_dir() -> PathBuf {
     PathBuf::from(r"C:\ProgramData\RustDesk\config")
 }
 
-fn write_configs(cfg: &AppConfig, log: &mut fs::File) -> io::Result<()> {
-    let toml = build_toml(cfg);
+fn write_configs(log: &mut fs::File) -> io::Result<()> {
+    let toml = build_toml();
 
     // LocalService (служба).
     let svc_cfg_dir = localservice_cfg_dir();

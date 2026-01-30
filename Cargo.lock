@@ -663,9 +663,7 @@ dependencies = [
  "embed-resource",
  "regex",
  "reqwest",
- "serde",
  "sha2",
- "toml",
  "windows-sys 0.48.0",
 ]
 

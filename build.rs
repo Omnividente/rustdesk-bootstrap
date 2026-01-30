@@ -6,12 +6,31 @@ use std::{
 };
 
 fn main() {
+    // Конфиг: берем локальный (не в репо) или пример
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let cfg_local = manifest_dir.join("config.local.rs");
+    let cfg_example = manifest_dir.join("config.example.rs");
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_cfg = out_dir.join("config.rs");
+
+    println!("cargo:rerun-if-changed={}", cfg_local.display());
+    println!("cargo:rerun-if-changed={}", cfg_example.display());
+
+    let cfg_src = if cfg_local.exists() {
+        cfg_local
+    } else {
+        println!("cargo:warning=Using config.example.rs (create config.local.rs with real values)");
+        cfg_example
+    };
+    if let Err(e) = fs::copy(&cfg_src, &out_cfg) {
+        panic!("failed to generate config.rs from {}: {}", cfg_src.display(), e);
+    }
+
     // Следить за изменениями исходников ресурсов
     println!("cargo:rerun-if-changed=assets/bootstrap.ico");
     println!("cargo:rerun-if-changed=assets/app.manifest");
 
     // Пути проекта
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let assets_dir   = manifest_dir.join("assets");
     let icon_path    = assets_dir.join("bootstrap.ico");
     let mani_path    = assets_dir.join("app.manifest");
@@ -24,7 +43,6 @@ fn main() {
     }
 
     // Сгенерируем временный RC c абсолютными путями (windres любит абсолютные пути)
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let gen_rc  = out_dir.join("resources_autogen.rc");
     let mut rc  = fs::File::create(&gen_rc).expect("create rc");
     // 24 = RT_MANIFEST

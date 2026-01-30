@@ -1,0 +1,7 @@
+[build]
+target = "x86_64-pc-windows-gnu"
+
+[target.x86_64-pc-windows-gnu]
+linker   = "C:\\llvm-mingw\\bin\\x86_64-w64-mingw32-gcc.exe"
+ar       = "C:\\llvm-mingw\\bin\\x86_64-w64-mingw32-ar.exe"
+rustflags = ["-C","target-feature=+crt-static"]

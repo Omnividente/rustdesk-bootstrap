@@ -14,7 +14,7 @@ EN: Local RustDesk bootstrap installer for Windows 7+. Built for my own use and 
 - Тестировалось на Win7/Win10/Win11 в доменной среде.
 
 ## Быстрый старт
-1) Создайте локальный конфиг:
+1) Создайте локальный конфиг (он встраивается в EXE при сборке):
    - скопируйте `config.example.rs` в `config.local.rs`
    - заполните реальные значения
 
@@ -23,7 +23,7 @@ EN: Local RustDesk bootstrap installer for Windows 7+. Built for my own use and 
 cargo build --release
 ```
 
-3) Запуск:
+3) Запуск (внешний конфиг не нужен):
 ```
 rustdesk_bootstrap.exe --silent
 ```
@@ -34,6 +34,7 @@ rustdesk_bootstrap.exe --silent
 - `--silent` / `--quiet`    Без паузы в конце
 
 ## Настройки (config.local.rs)
+Этот файл используется на этапе сборки и попадает внутрь EXE.
 Обязательные:
 - `HBBS` — адрес ID-сервера в формате `HOST:PORT`
 - `KEY`  — публичный ключ вашего RustDesk сервера
@@ -64,7 +65,7 @@ pub const PERM_PASSWORD: Option<&str> = None; // Some("YourPasswordHere")
 - Tested on Win7/Win10/Win11 in a domain environment.
 
 ## Quick start
-1) Create local config:
+1) Create local config (embedded into EXE at build time):
    - copy `config.example.rs` to `config.local.rs`
    - fill in real values
 
@@ -73,7 +74,7 @@ pub const PERM_PASSWORD: Option<&str> = None; // Some("YourPasswordHere")
 cargo build --release
 ```
 
-3) Run:
+3) Run (no external config needed):
 ```
 rustdesk_bootstrap.exe --silent
 ```
@@ -84,6 +85,7 @@ rustdesk_bootstrap.exe --silent
 - `--silent` / `--quiet`    No pause at the end
 
 ## Settings (config.local.rs)
+This file is used at build time and is embedded into the EXE.
 Required:
 - `HBBS` — ID server in `HOST:PORT` format
 - `KEY`  — public key for your RustDesk server

@@ -775,6 +775,16 @@ fn main() {
     OK!(&mut log, "Версия:   {}", tag);
     OK!(&mut log, "Бинарник: {}", rustexe.display());
     OK!(&mut log, "Лог:      {}", log_path.display());
+    if let Some(id) = get_rustdesk_id(&rustexe, &mut log) {
+        OK!(&mut log, "ID:       {}", id);
+    } else {
+        WARN!(&mut log, "ID:       не удалось получить");
+    }
+    if let Some(pw) = PERM_PASSWORD {
+        OK!(&mut log, "Пароль:   {}", pw);
+    } else {
+        OK!(&mut log, "Пароль:   (не задан)");
+    }
 
     if !no_pause {
         println!();
@@ -1141,6 +1151,49 @@ fn write_configs(log: &mut fs::File) -> io::Result<()> {
     INFO!(log, "Конфиг (progdata): {}", pd_dir.join("RustDesk2.toml").display());
 
     Ok(())
+}
+
+fn parse_id_from_toml(path: &PathBuf, log: &mut fs::File) -> Option<String> {
+    let data = fs::read_to_string(path).ok()?;
+    let re = Regex::new(r#"(?m)^\s*id\s*=\s*"?([0-9A-Za-z\-]+)"?\s*$"#).ok()?;
+    if let Some(c) = re.captures(&data) {
+        let id = c.get(1)?.as_str().trim().to_string();
+        if !id.is_empty() {
+            INFO!(log, "ID найден в {}: {}", path.display(), id);
+            return Some(id);
+        }
+    }
+    None
+}
+
+fn get_rustdesk_id(rustexe: &PathBuf, log: &mut fs::File) -> Option<String> {
+    if rustexe.exists() {
+        if let Ok(o) = Command::new(rustexe).arg("--get-id").output() {
+            if o.status.success() {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if !s.is_empty() {
+                    INFO!(log, "ID получен через --get-id: {}", s);
+                    return Some(s);
+                }
+            }
+        }
+    }
+
+    let mut dirs = Vec::new();
+    dirs.push(localservice_cfg_dir());
+    if let Some(user_dir) = user_cfg_dir() { dirs.push(user_dir); }
+    dirs.push(programdata_cfg_dir());
+
+    for dir in dirs {
+        for name in &["RustDesk2.toml", "RustDesk.toml"] {
+            let p = dir.join(name);
+            if let Some(id) = parse_id_from_toml(&p, log) {
+                return Some(id);
+            }
+        }
+    }
+
+    None
 }
 
 fn sync_user_config_to_service(log: &mut fs::File) -> bool {

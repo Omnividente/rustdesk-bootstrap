@@ -28,6 +28,10 @@ cargo build --release
 rustdesk_bootstrap.exe --silent
 ```
 
+После установки установщик выводит:
+- текущий RustDesk ID (если удалось получить)
+- постоянный пароль (если задан в конфиге)
+
 ## Параметры запуска
 - `--local-installer=PATH`  Локальный MSI/EXE RustDesk (рекомендую для оффлайн)
 - `--force-x86`             Принудительно x86-установщик
@@ -78,6 +82,10 @@ cargo build --release
 ```
 rustdesk_bootstrap.exe --silent
 ```
+
+After installation the bootstrap prints:
+- current RustDesk ID (if detected)
+- permanent password (if set in config)
 
 ## CLI flags
 - `--local-installer=PATH`  Use local RustDesk MSI/EXE (recommended for offline)

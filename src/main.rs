@@ -791,6 +791,7 @@ fn main() {
     // Визуально выделяем ID и пароль в консоли.
     println!();
     print_colored("========================================", Lvl::Step);
+    print_colored("========================================", Lvl::Step);
     print_colored("ВАЖНО: ДАННЫЕ ДЛЯ ПОДКЛЮЧЕНИЯ", Lvl::Step);
     if let Some(id) = id_value {
         print_colored(&format!("ID:       {}", id), Lvl::Ok);
@@ -806,6 +807,7 @@ fn main() {
         print_colored("Пароль:   (не задан)", Lvl::Ok);
         log_file_line(&mut log, "SUMMARY", "Пароль: (не задан)");
     }
+    print_colored("========================================", Lvl::Step);
     print_colored("========================================", Lvl::Step);
 
     if !no_pause {

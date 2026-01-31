@@ -775,16 +775,38 @@ fn main() {
     OK!(&mut log, "Версия:   {}", tag);
     OK!(&mut log, "Бинарник: {}", rustexe.display());
     OK!(&mut log, "Лог:      {}", log_path.display());
-    if let Some(id) = get_rustdesk_id(&rustexe, &mut log) {
+    let id_value = get_rustdesk_id(&rustexe, &mut log);
+    if let Some(ref id) = id_value {
         OK!(&mut log, "ID:       {}", id);
     } else {
         WARN!(&mut log, "ID:       не удалось получить");
     }
-    if let Some(pw) = PERM_PASSWORD {
+    let pw_value = PERM_PASSWORD;
+    if let Some(pw) = pw_value {
         OK!(&mut log, "Пароль:   {}", pw);
     } else {
         OK!(&mut log, "Пароль:   (не задан)");
     }
+
+    // Визуально выделяем ID и пароль в консоли.
+    println!();
+    print_colored("========================================", Lvl::Step);
+    print_colored("ВАЖНО: ДАННЫЕ ДЛЯ ПОДКЛЮЧЕНИЯ", Lvl::Step);
+    if let Some(id) = id_value {
+        print_colored(&format!("ID:       {}", id), Lvl::Ok);
+        log_file_line(&mut log, "SUMMARY", &format!("ID: {}", id));
+    } else {
+        print_colored("ID:       (не удалось получить)", Lvl::Warn);
+        log_file_line(&mut log, "SUMMARY", "ID: (не удалось получить)");
+    }
+    if let Some(pw) = pw_value {
+        print_colored(&format!("Пароль:   {}", pw), Lvl::Ok);
+        log_file_line(&mut log, "SUMMARY", &format!("Пароль: {}", pw));
+    } else {
+        print_colored("Пароль:   (не задан)", Lvl::Ok);
+        log_file_line(&mut log, "SUMMARY", "Пароль: (не задан)");
+    }
+    print_colored("========================================", Lvl::Step);
 
     if !no_pause {
         println!();
